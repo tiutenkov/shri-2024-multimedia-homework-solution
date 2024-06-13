@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"/>
+    <title>Stories</title>
+
+    <link rel="stylesheet" href="http://localhost:3000/index.css"/>
+</head>
+
+<body>
+<div class="root">
+    <div class="stop-screen" onclick="togglePlay()">
+        <div class="stop-screen__plate"></div>
+        <svg class="stop-screen__button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path
+                    d="M11.0748 7.50835C9.74622 6.72395 8.25 7.79065 8.25 9.21316V14.7868C8.25 16.2093 9.74622 17.276 11.0748 16.4916L15.795 13.7048C17.0683 12.953 17.0683 11.047 15.795 10.2952L11.0748 7.50835ZM9.75 9.21316C9.75 9.01468 9.84615 8.87585 9.95947 8.80498C10.0691 8.73641 10.1919 8.72898 10.3122 8.80003L15.0324 11.5869C15.165 11.6652 15.25 11.8148 15.25 12C15.25 12.1852 15.165 12.3348 15.0324 12.4131L10.3122 15.2C10.1919 15.271 10.0691 15.2636 9.95947 15.195C9.84615 15.1242 9.75 14.9853 9.75 14.7868V9.21316Z"/>
+            <path
+                    d="M12 1.25C6.06294 1.25 1.25 6.06294 1.25 12C1.25 17.9371 6.06294 22.75 12 22.75C17.9371 22.75 22.75 17.9371 22.75 12C22.75 6.06294 17.9371 1.25 12 1.25ZM2.75 12C2.75 6.89137 6.89137 2.75 12 2.75C17.1086 2.75 21.25 6.89137 21.25 12C21.25 17.1086 17.1086 21.25 12 21.25C6.89137 21.25 2.75 17.1086 2.75 12Z"/>
+        </svg>
+    </div>
+    <div class="progress">
+        <!-- script inserted progress-bars -->
+    </div>
+    <div class="stories" onclick="togglePlay()">
+        <!-- script inserted stories -->
+    </div>
+    <button class="show-reactions-btn">👍</button>
+    <div class="controls">
+        <div class="controls__buttons">
+            <button onclick="prev()" class="button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L9.83 12l5.58-5.59z"/>
+                </svg>
+            </button>
+            <button onclick="next()" class="button button_next">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L9.83 12l5.58-5.59z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const videosSrc = [
+        'http://localhost:3000/assets/1.mp4',
+        'http://localhost:3000/assets/2.mp4',
+        'http://localhost:3000/assets/3.mp4',
+        'http://localhost:3000/assets/4.mp4',
+        'http://localhost:3000/assets/5.mp4',
+    ];
+
+    const SLIDE_TRANSITION = 500;
+    const MAX_SLIDER_WIDTH = 450;
+
+    let currentStoryIndex = 0;
+
+    const stopScreen = document.querySelector('.stop-screen');
+    const progressContainer = document.querySelector('.progress');
+    const slider = document.querySelector('.stories');
+
+    slider.style.transition = `transform ${SLIDE_TRANSITION}ms`;
+
+    const slideWidth = Math.min(
+        document.documentElement.clientWidth,
+        MAX_SLIDER_WIDTH,
+    );
+
+    let prevVideo;
+    for (let index = 0; index < videosSrc.length; index++) {
+        const video = initStory(index, videosSrc[index]);
+
+        prevVideo?.addEventListener('ended', () => {
+            next();
+            setTimeout(() => video.play(), SLIDE_TRANSITION);
+        });
+
+        if (index === videosSrc.length - 1) {
+            video.addEventListener('ended', () => {
+
+                /** Когда проигралась последняя история, показываем элемент управления - play/pause */
+                getStory(currentStoryIndex).pause();
+                stopScreen.classList.remove('stop-screen_playing');
+            });
+        }
+
+        prevVideo = video;
+    }
+
+
+    const showReactionsBtn = document.querySelector('.show-reactions-btn');
+    const rootContainer = document.querySelector('.root');
+
+    const overlayContainer = createOverlayContainer();
+    const reactionsContainer = createReactionsContainer();
+
+    showReactionsBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+
+        pause(currentStoryIndex);
+        showReactionsBar();
+    });
+
+    overlayContainer.addEventListener('click', event => {
+        event.stopPropagation();
+
+        hideReactionsBar();
+
+        start(currentStoryIndex);
+        removeReactionsListeners();
+    });
+
+    function handleReactionClick(event) {
+        event.stopPropagation();
+
+        const reactionEmoji = event.target.innerHTML;
+
+        hideReactionsBar();
+        handleAnimateReactions(reactionEmoji);
+
+        start(currentStoryIndex);
+        removeReactionsListeners();
+    }
+
+
+    function addReactionsListeners() {
+        const reactions = reactionsContainer.querySelectorAll('.reaction');
+        reactions.forEach(button => button.addEventListener('click', handleReactionClick));
+    }
+
+    function removeReactionsListeners() {
+        const reactions = reactionsContainer.querySelectorAll('.reaction');
+        reactions.forEach(button => button.removeEventListener('click', handleReactionClick));
+    }
+
+
+    function showReactionsBar() {
+        rootContainer.appendChild(overlayContainer);
+        rootContainer.appendChild(reactionsContainer);
+
+        addReactionsListeners();
+    }
+
+    function hideReactionsBar() {
+        overlayContainer.remove();
+        reactionsContainer.remove();
+    }
+
+
+    function createOverlayContainer() {
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+
+        return overlay;
+    }
+
+
+    function createReactionsContainer() {
+        const container = document.createElement('div');
+
+        container.className = 'reactions';
+
+        const reactions = ['👍', '❤️', '😂', '😮', '😢'];
+        reactions.forEach(reaction => {
+            const button = document.createElement('button');
+
+            button.className = 'reaction';
+            button.dataset.reaction = reaction;
+            button.innerHTML = reaction;
+
+            container.appendChild(button);
+        });
+
+        return container;
+    }
+
+
+    function handleAnimateReactions(reactionEmoji) {
+        const ANIMATED_REACTIONS_COUNT = 15;
+        for (let i = 0; i < ANIMATED_REACTIONS_COUNT; i++) {
+            const flyingReaction = document.createElement('span');
+            flyingReaction.className = 'flying-reaction';
+            flyingReaction.innerHTML = reactionEmoji;
+
+            flyingReaction.style.animationDelay = `${Math.random() * 0.5}s`;
+            flyingReaction.style.left = `${Math.random() * 80}%`;
+
+            insertAfter(getStory(currentStoryIndex), flyingReaction);
+
+            flyingReaction.addEventListener('animationend', () => {
+                flyingReaction.remove();
+            });
+        }
+    }
+
+    function insertAfter(referenceNode, newNode) {
+        referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
+    }
+
+    function getStory(index) {
+        return document.getElementById(`video-${index}`);
+    }
+
+    function getProgressBar(index) {
+        return document.getElementById(`progress-${index}`);
+    }
+
+    function updateProgressBar(index, value) {
+        if (value === undefined) {
+            const story = getStory(index);
+            value = story.currentTime / story.duration;
+        }
+
+        getProgressBar(index).style.transform = `scaleX(${value}`;
+    }
+
+    function initStory(id, src) {
+        slider.insertAdjacentHTML(
+            'beforeend',
+            `<div class="stories__story">
+                <video id="video-${id}" class="stories__video" src="${src}"></video>
+            </div>`,
+        );
+
+        progressContainer.insertAdjacentHTML(
+            'beforeend',
+            `<span class="progress__bar">
+                <span id="progress-${id}" class="progress__bar-value"></span>
+            </span>`,
+        );
+
+        return getStory(id);
+    }
+
+    function togglePlay(index) {
+        const currentStory = getStory(index || currentStoryIndex);
+
+        if (currentStory.paused) {
+            currentStory.play();
+            stopScreen.classList.add('stop-screen_playing');
+        } else {
+            currentStory.pause();
+            stopScreen.classList.remove('stop-screen_playing');
+        }
+    }
+
+    function start(index) {
+        getStory(index || currentStoryIndex).play();
+        getProgressBar();
+    }
+
+    function pause(index) {
+        getStory(index || currentStoryIndex).pause();
+    }
+
+    function toZero(index) {
+        const elemIdx = index || currentStoryIndex;
+        pause(elemIdx);
+
+        getProgressBar(elemIdx);
+
+        setTimeout(() => (getStory(elemIdx).currentTime = 0), SLIDE_TRANSITION);
+    }
+
+    function move() {
+        slider.style.transform = `translateX(-${currentStoryIndex * slideWidth}px)`;
+    }
+
+
+    function prev() {
+        if (currentStoryIndex > 0) {
+            toZero();
+
+            currentStoryIndex -= 1;
+            updateProgressBar(currentStoryIndex + 1, 0);
+            move();
+            start();
+            hideReactionsBar(currentStoryIndex);
+        }
+    }
+
+    function next() {
+        if (currentStoryIndex < videosSrc.length - 1) {
+            toZero();
+
+            currentStoryIndex += 1;
+            updateProgressBar(currentStoryIndex - 1, 1);
+            move();
+            start();
+            hideReactionsBar(currentStoryIndex);
+        }
+    }
+
+    function currentStoryWatcher() {
+        updateProgressBar(currentStoryIndex);
+
+        requestAnimationFrame(currentStoryWatcher);
+    }
+
+    requestAnimationFrame(currentStoryWatcher);
+</script>
+</body>
+
+</html>
